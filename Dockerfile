@@ -1,5 +1,10 @@
 FROM buildpack-deps:jessie
 
+# EXTRA PARAMETERS
+ENV PHP_EXTRA_CONFIGURE_ARGS=" \
+	--enable-zip \
+"
+
 # PHP
 # https://github.com/docker-library/php/blob/ec02e1bcf1196ed3f8b74ecc956cf81554e32db8/7.1/Dockerfile
 
