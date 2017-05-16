@@ -5,8 +5,8 @@ ENV PHP_EXTRA_CONFIGURE_ARGS=" \
 	--enable-zip \
 "
 
-# PHP
-# https://github.com/docker-library/php/blob/ec02e1bcf1196ed3f8b74ecc956cf81554e32db8/7.1/Dockerfile
+# PHP 7.1.4
+# https://github.com/docker-library/php/blob/fa6464a43d74d8b0a5ec3f22d53ac330f63ad22d/7.1/Dockerfile
 
 # persistent / runtime deps
 ENV PHPIZE_DEPS \
@@ -46,9 +46,9 @@ ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
 
 ENV GPG_KEYS A917B1ECDA84AEC2B568FED6F50ABC807BD5DCD0 528995BFEDFBA7191D46839EF9BA0ADA31CBD89E
 
-ENV PHP_VERSION 7.1.3
-ENV PHP_URL="https://secure.php.net/get/php-7.1.3.tar.xz/from/this/mirror" PHP_ASC_URL="https://secure.php.net/get/php-7.1.3.tar.xz.asc/from/this/mirror"
-ENV PHP_SHA256="e4887c2634778e37fd962fbdf5c4a7d32cd708482fe07b448804625570cb0bb0" PHP_MD5="d604d688be17f4a05b99dbb7fb9581f4"
+ENV PHP_VERSION 7.1.4
+ENV PHP_URL="https://secure.php.net/get/php-7.1.4.tar.xz/from/this/mirror" PHP_ASC_URL="https://secure.php.net/get/php-7.1.4.tar.xz.asc/from/this/mirror"
+ENV PHP_SHA256="71514386adf3e963df087c2044a0b3747900b8b1fc8da3a99f0a0ae9180d300b" PHP_MD5="a74c13f8779349872b365e6732e8c98e"
 
 RUN set -xe; \
 	\
@@ -130,7 +130,8 @@ RUN set -xe \
 
 COPY docker-php-ext-* /usr/local/bin/
 
-# Composer
+
+# Composer 1.4.1
 # https://github.com/composer/docker/blob/c5557dc348d9b986aec883e919d202ff76fa5d56/1.4/Dockerfile
 
 RUN echo "memory_limit=-1" > "$PHP_INI_DIR/conf.d/memory-limit.ini" \
@@ -154,8 +155,8 @@ RUN curl -s -f -L -o /tmp/installer.php https://raw.githubusercontent.com/compos
  && rm /tmp/installer.php \
  && composer --ansi --version --no-interaction
 
-# Node.js
-# https://github.com/nodejs/docker-node/blob/189588b1b52f80f8b3cec7f432ac60c0e884116e/7.8/Dockerfile
+# Node.js 7.9.0
+# https://github.com/nodejs/docker-node/blob/e1103db1e7330f620ec4b5961b93936da11becdf/7.9/wheezy/Dockerfile
 
 RUN groupadd --gid 1000 node \
   && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
@@ -172,34 +173,39 @@ RUN set -ex \
     C4F0DFFF4E8C1A8236409D08E73BC641CC11F4C8 \
     56730D5401028683275BD23C23EFEFE93C4CFFFE \
   ; do \
-    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key"; \
+    gpg --keyserver pgp.mit.edu --recv-keys "$key" || \
+    gpg --keyserver keyserver.pgp.com --recv-keys "$key" || \
+    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key" ; \
   done
 
 ENV NPM_CONFIG_LOGLEVEL info
-ENV NODE_VERSION 7.8.0
+ENV NODE_VERSION 7.10.0
 
 RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
-  && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
+  && curl -SLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
   && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
   && grep " node-v$NODE_VERSION-linux-x64.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
   && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
   && rm "node-v$NODE_VERSION-linux-x64.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
   && ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
-ENV YARN_VERSION 0.21.3
+ENV YARN_VERSION 0.24.4
 
 RUN set -ex \
   && for key in \
     6A010C5166006599AA17F08146C2130DFD2497F5 \
   ; do \
-    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key"; \
+    gpg --keyserver pgp.mit.edu --recv-keys "$key" || \
+    gpg --keyserver keyserver.pgp.com --recv-keys "$key" || \
+    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key" ; \
   done \
-  && curl -fSL -o yarn.js "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-legacy-$YARN_VERSION.js" \
-  && curl -fSL -o yarn.js.asc "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-legacy-$YARN_VERSION.js.asc" \
+  && curl -fSL --compressed -o yarn.js "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-legacy-$YARN_VERSION.js" \
+  && curl -fSL --compressed -o yarn.js.asc "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-legacy-$YARN_VERSION.js.asc" \
   && gpg --batch --verify yarn.js.asc yarn.js \
   && rm yarn.js.asc \
   && mv yarn.js /usr/local/bin/yarn \
-&& chmod +x /usr/local/bin/yarn
+  && chmod +x /usr/local/bin/yarn
+
 
 # Install Bower & Grunt
 # https://github.com/DigitallySeamless/docker-nodejs-bower-grunt/blob/v0.8/Dockerfile
