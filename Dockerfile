@@ -130,6 +130,8 @@ RUN set -xe \
 
 COPY docker-php-ext-* /usr/local/bin/
 
+RUN docker-php-ext-install mysqli
+
 
 # Composer 1.4.1
 # https://github.com/composer/docker/blob/c5557dc348d9b986aec883e919d202ff76fa5d56/1.4/Dockerfile
