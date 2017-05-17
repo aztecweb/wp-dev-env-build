@@ -214,3 +214,6 @@ RUN npm install -g bower grunt-cli \
  && echo '{ "allow_root": true }' > /root/.bowerrc
 
 WORKDIR /data
+
+# livereload port
+EXPOSE 35729
