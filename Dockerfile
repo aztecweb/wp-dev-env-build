@@ -164,6 +164,14 @@ RUN curl -s -f -L -o /tmp/installer.php https://raw.githubusercontent.com/compos
  && rm /tmp/installer.php \
  && composer --ansi --version --no-interaction
 
+
+# WP-CLI latest version
+# https://github.com/pierreprinetti/docker-wp-cli/blob/master/Dockerfile
+
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+RUN chmod +x wp-cli.phar && mv wp-cli.phar /bin/wp
+
+
 # Node.js 7.10.0
 # https://github.com/nodejs/docker-node/blob/b10c352085bbb7933d22bba1215ada9d266dd365/4.8/Dockerfile
 
