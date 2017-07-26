@@ -5,8 +5,9 @@ ENV PHP_EXTRA_CONFIGURE_ARGS=" \
 	--enable-zip \
 "
 
-# PHP 7.1.5
-# https://github.com/docker-library/php/blob/76a1c5ca161f1ed6aafb2c2d26f83ec17360bc68/7.1/Dockerfile
+
+# PHP 7.1.7
+# https://github.com/docker-library/php/blob/ddc7084c8a78ea12f0cfdceff7d03c5a530b787e/7.1/Dockerfile
 
 # persistent / runtime deps
 ENV PHPIZE_DEPS \
@@ -48,15 +49,21 @@ ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
 
 ENV GPG_KEYS A917B1ECDA84AEC2B568FED6F50ABC807BD5DCD0 528995BFEDFBA7191D46839EF9BA0ADA31CBD89E
 
-ENV PHP_VERSION 7.1.5
-ENV PHP_URL="https://secure.php.net/get/php-7.1.5.tar.xz/from/this/mirror" PHP_ASC_URL="https://secure.php.net/get/php-7.1.5.tar.xz.asc/from/this/mirror"
-ENV PHP_SHA256="d149a3c396c45611f5dc6bf14be190f464897145a76a8e5851cf18ff7094f6ac" PHP_MD5="fb0702321c7aceac68c82b8c7a10d196"
+ENV PHP_VERSION 7.1.7
+ENV PHP_URL="https://secure.php.net/get/php-7.1.7.tar.xz/from/this/mirror" PHP_ASC_URL="https://secure.php.net/get/php-7.1.7.tar.xz.asc/from/this/mirror"
+ENV PHP_SHA256="0d42089729be7b2bb0308cbe189c2782f9cb4b07078c8a235495be5874fff729" PHP_MD5=""
 
 RUN set -xe; \
 	\
 	fetchDeps=' \
 		wget \
 	'; \
+	if ! command -v gpg > /dev/null; then \
+		fetchDeps="$fetchDeps \
+			dirmngr \
+			gnupg2 \
+		"; \
+	fi; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends $fetchDeps; \
 	rm -rf /var/lib/apt/lists/*; \
@@ -80,10 +87,10 @@ RUN set -xe; \
 			gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key"; \
 		done; \
 		gpg --batch --verify php.tar.xz.asc php.tar.xz; \
-		rm -r "$GNUPGHOME"; \
+		rm -rf "$GNUPGHOME"; \
 	fi; \
 	\
-	apt-get purge -y --auto-remove $fetchDeps
+	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $fetchDeps
 
 COPY docker-php-source /usr/local/bin/
 
@@ -95,6 +102,7 @@ RUN set -xe \
 		libsqlite3-dev \
 		libssl-dev \
 		libxml2-dev \
+		zlib1g-dev \
 	" \
 	&& apt-get update && apt-get install -y $buildDeps --no-install-recommends && rm -rf /var/lib/apt/lists/* \
 	\
@@ -104,6 +112,11 @@ RUN set -xe \
 	&& docker-php-source extract \
 	&& cd /usr/src/php \
 	&& gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
+	&& debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)" \
+# https://bugs.php.net/bug.php?id=74125
+	&& if [ ! -d /usr/include/curl ]; then \
+		ln -sT "/usr/include/$debMultiarch/curl" /usr/local/include/curl; \
+	fi \
 	&& ./configure \
 		--build="$gnuArch" \
 		--with-config-file-path="$PHP_INI_DIR" \
@@ -126,18 +139,35 @@ RUN set -xe \
 # bundled pcre is too old for s390x (which isn't exactly a good sign)
 # /usr/src/php/ext/pcre/pcrelib/pcre_jit_compile.c:65:2: error: #error Unsupported architecture
 		--with-pcre-regex=/usr \
-		--with-libdir="lib/$gnuArch" \
+		--with-libdir="lib/$debMultiarch" \
 		\
 		$PHP_EXTRA_CONFIGURE_ARGS \
 	&& make -j "$(nproc)" \
 	&& make install \
 	&& { find /usr/local/bin /usr/local/sbin -type f -executable -exec strip --strip-all '{}' + || true; } \
 	&& make clean \
+	&& cd / \
 	&& docker-php-source delete \
 	\
-	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $buildDeps
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $buildDeps \
+	\
+# https://github.com/docker-library/php/issues/443
+	&& pecl update-channels \
+	&& rm -rf /tmp/pear ~/.pearrc
 
 COPY docker-php-ext-* /usr/local/bin/
+
+# MySQLi extension
+RUN docker-php-ext-install mysqli
+
+# GD extension
+RUN apt-get update && apt-get install -y \
+		libfreetype6-dev \
+		libjpeg62-turbo-dev \
+		libmcrypt-dev \
+		libpng12-dev \
+	&& docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ \
+	&& docker-php-ext-install -j$(nproc) gd
 
 
 # Composer 1.4.2
@@ -172,8 +202,8 @@ RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli
 RUN chmod +x wp-cli.phar && mv wp-cli.phar /bin/wp
 
 
-# Node.js 7.10.0
-# https://github.com/nodejs/docker-node/blob/b10c352085bbb7933d22bba1215ada9d266dd365/4.8/Dockerfile
+# Node.js 8.2.1
+# https://github.com/nodejs/docker-node/blob/9c25cbe93f9108fd1e506d14228afe4a3d04108f/8.2/Dockerfile
 
 RUN groupadd --gid 1000 node \
   && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
@@ -196,17 +226,23 @@ RUN set -ex \
   done
 
 ENV NPM_CONFIG_LOGLEVEL info
-ENV NODE_VERSION 7.10.0
+ENV NODE_VERSION 8.2.1
 
-RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
+RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
+  && case "${dpkgArch##*-}" in \
+    amd64) ARCH='x64';; \
+    ppc64el) ARCH='ppc64le';; \
+    *) echo "unsupported architecture"; exit 1 ;; \
+  esac \
+  && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" \
   && curl -SLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
   && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
-  && grep " node-v$NODE_VERSION-linux-x64.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
-  && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
-  && rm "node-v$NODE_VERSION-linux-x64.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
+  && grep " node-v$NODE_VERSION-linux-$ARCH.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
+  && tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /usr/local --strip-components=1 \
+  && rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
   && ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
-ENV YARN_VERSION 0.24.4
+ENV YARN_VERSION 0.27.5
 
 RUN set -ex \
   && for key in \
@@ -225,9 +261,7 @@ RUN set -ex \
   && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \
   && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz
 
-
 # Install Bower & Grunt
-# https://github.com/DigitallySeamless/docker-nodejs-bower-grunt/blob/v0.8/Dockerfile
 
 RUN npm install -g bower grunt-cli \
  && echo '{ "allow_root": true }' > /root/.bowerrc
